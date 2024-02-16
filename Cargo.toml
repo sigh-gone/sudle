@@ -1,0 +1,13 @@
+[package]
+name = "sudle"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aes = "0.8.4" # Check for the latest version
+rand = "0.8.5"
+cipher = "0.4.4"
+ctr = "0.9.1"
+walkdir = "2.3.2"
