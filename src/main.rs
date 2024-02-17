@@ -20,8 +20,6 @@ fn main() {
     let full = format!("{home}/projects/sudle/test_files", home = home.display());
     let paths = search_txt_files(&full);
     for file_path in paths {
-        let file_new_path = remove_suffix(&file_path, ".txt");
-        let output_file_path = format!("{}.sudle", file_new_path);
         match encrypt_decrypt(&file_path, &key, false) {
             Ok(path) => {
                 match encrypt_decrypt(path.as_str(), &key, true){
